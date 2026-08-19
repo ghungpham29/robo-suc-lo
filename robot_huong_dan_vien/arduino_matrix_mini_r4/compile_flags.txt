@@ -1,0 +1,6 @@
+-x
+c++
+-std=c++17
+-DARDUINO=10819
+-DARDUINO_UNOR4_MINIMA
+-w

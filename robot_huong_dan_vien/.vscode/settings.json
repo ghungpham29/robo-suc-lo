@@ -1,0 +1,15 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\ADMIN\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+  "python.analysis.extraPaths": [
+    "./Kokoro-Vietnamese-src/Kokoro-Vietnamese-main/src",
+    "${workspaceFolder}/Kokoro-Vietnamese-src/Kokoro-Vietnamese-main/src"
+  ],
+  "python.autoComplete.extraPaths": [
+    "./Kokoro-Vietnamese-src/Kokoro-Vietnamese-main/src",
+    "${workspaceFolder}/Kokoro-Vietnamese-src/Kokoro-Vietnamese-main/src"
+  ],
+  "files.associations": {
+    "*.ino": "cpp"
+  }
+}
+
