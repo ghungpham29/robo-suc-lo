@@ -23,10 +23,13 @@ const uint16_t LASER_DETECT_MAX_MM    = 800;    // Khoảng cách Laser phát hi
 const uint16_t LASER_DETECT_MIN_MM    = 40;     // Khoảng cách tối thiểu loại trừ nhiễu bề mặt
 
 // Cấu hình góc quay Servo (Micro Servo SG90 / MG90S)
-const int SERVO_REST_ANGLE            = 90;     // Góc nghỉ mặc định (tay hạ xuống)
-const int SERVO_PRESENT_ANGLE         = 165;    // Góc giơ tay phải thuyết trình
-const int SERVO_WAVE_HIGH_ANGLE       = 150;    // Góc vẫy tay lên cao
-const int SERVO_WAVE_LOW_ANGLE        = 40;     // Góc vẫy tay xuống thấp
+const int SERVO1_REST_ANGLE    = 40;    // Góc nghỉ mặc định tay trái (RC1)
+const int SERVO2_REST_ANGLE    = 57;    // Góc nghỉ mặc định tay phải (RC2)
+const int SERVO2_PRESENT_ANGLE = 0;     // Góc tay phải (RC2) khi giơ tay thuyết trình
+
+// Bổ sung: Cấu hình góc quay cho chế độ vẫy tay (Lệnh W)
+const int SERVO_WAVE_HIGH_ANGLE = 0;    // Góc đưa tay lên cao khi vẫy
+const int SERVO_WAVE_LOW_ANGLE  = 80;   // Góc hạ tay xuống thấp khi vẫy
 
 // Cấu hình công suất động cơ DC
 const int MOTOR_FORWARD_POWER         = 55;     // Công suất tiến (0 - 100%)
@@ -81,22 +84,22 @@ void moveBackward() {
 }
 
 /**
- * @brief Đưa cả 2 cánh tay về tư thế nghỉ mặc định (90 độ).
+ * @brief Đưa cả 2 cánh tay về tư thế nghỉ mặc định.
  */
 void gestureDown() {
-  Serial.println("[STATUS]: Arms to Rest Position (D - 90 deg)");
-  MiniR4.RC1.setAngle(SERVO_REST_ANGLE); // Tay trái
-  MiniR4.RC2.setAngle(SERVO_REST_ANGLE); // Tay phải
+  Serial.println("[STATUS]: Arms to Rest Position (D)");
+  MiniR4.RC1.setAngle(SERVO1_REST_ANGLE); // Tay trái
+  MiniR4.RC2.setAngle(SERVO2_REST_ANGLE); // Tay phải
   Serial.println("ACK:ARMS_DOWN");
 }
 
 /**
- * @brief Cử chỉ thuyết trình ('P'): Giơ MỘT cánh tay (Tay phải - RC2) lên cao, tay trái giữ nguyên 90 độ.
+ * @brief Cử chỉ thuyết trình ('P'): Giơ MỘT cánh tay (Tay phải - RC2) lên cao.
  */
 void gesturePresent() {
   Serial.println("[STATUS]: Presenting Gesture (P - Right Arm Up)");
-  MiniR4.RC1.setAngle(SERVO_REST_ANGLE);       // Tay trái giữ nguyên vị trí nghỉ (90 độ)
-  MiniR4.RC2.setAngle(SERVO_PRESENT_ANGLE);    // Tay phải giơ lên làm cử chỉ chỉ trỏ thuyết minh
+  MiniR4.RC1.setAngle(SERVO1_REST_ANGLE);    // Tay trái giữ nguyên vị trí nghỉ
+  MiniR4.RC2.setAngle(SERVO2_PRESENT_ANGLE); // Tay phải giơ lên làm cử chỉ chỉ trỏ thuyết minh
   Serial.println("ACK:PRESENT");
 }
 
@@ -120,6 +123,31 @@ void gestureWave() {
   // Trở về tư thế nghỉ mặc định
   gestureDown();
   Serial.println("ACK:WAVE_DONE");
+}
+
+/**
+ * @brief Kiểm tra quét hoạt động Servo ('T'): Thử nghiệm các góc giơ tay & vẫy tay rồi về vị trí nghỉ.
+ */
+void testSweep() {
+  Serial.println("[STATUS]: Testing Servo Sweep (T)");
+  // Giơ tay thuyết trình 1s
+  MiniR4.RC1.setAngle(SERVO1_REST_ANGLE);
+  MiniR4.RC2.setAngle(SERVO2_PRESENT_ANGLE);
+  delay(1000);
+
+  // Vẫy tay 2 nhịp
+  for (int i = 0; i < 2; i++) {
+    MiniR4.RC1.setAngle(SERVO_WAVE_HIGH_ANGLE);
+    MiniR4.RC2.setAngle(SERVO_WAVE_HIGH_ANGLE);
+    delay(300);
+    MiniR4.RC1.setAngle(SERVO_WAVE_LOW_ANGLE);
+    MiniR4.RC2.setAngle(SERVO_WAVE_LOW_ANGLE);
+    delay(300);
+  }
+
+  // Trở về tư thế nghỉ
+  gestureDown();
+  Serial.println("ACK:SWEEP_DONE");
 }
 
 // =============================================================================
@@ -148,7 +176,7 @@ void setup() {
   // 6. Đảm bảo toàn bộ động cơ đang dừng
   stopMotors();
 
-  // 7. Đưa 2 Servo về tư thế nghỉ mặc định (90 độ)
+  // 7. Đưa 2 Servo về tư thế nghỉ mặc định
   gestureDown();
 
   Serial.println("[SYSTEM_READY]: Matrix Mini R4 Robot Controller Initialized.");
@@ -213,9 +241,14 @@ void loop() {
         gestureWave();
         break;
 
-      case 'D': // Hạ 2 tay về tư thế nghỉ (90 độ)
+      case 'D': // Hạ 2 tay về tư thế nghỉ
       case 'd':
         gestureDown();
+        break;
+
+      case 'T': // Kiểm tra quét toàn diện Servo
+      case 't':
+        testSweep();
         break;
 
       default:

@@ -1,7 +1,7 @@
 # --- CÁC THƯ VIỆN CỐT LÕI (CORE DEPENDENCIES) ---
 google-genai>=2.0.0
 gTTS>=2.5.0
-pygame>=2.6.0
+pygame-ce>=2.5.0
 python-dotenv>=1.0.0
 
 # --- NÂNG CẤP V2.0 (ADVANCED UPGRADES) ---
