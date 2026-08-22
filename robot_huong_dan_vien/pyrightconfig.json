@@ -1,5 +1,8 @@
 {
   "extraPaths": [
+    ".",
+    "..",
+    "task3_voice",
     "Kokoro-Vietnamese-src/Kokoro-Vietnamese-main/src"
   ]
 }

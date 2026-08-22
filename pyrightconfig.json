@@ -1,0 +1,8 @@
+{
+  "extraPaths": [
+    ".",
+    "robot_huong_dan_vien",
+    "robot_huong_dan_vien/task3_voice",
+    "robot_huong_dan_vien/Kokoro-Vietnamese-src/Kokoro-Vietnamese-main/src"
+  ]
+}

@@ -30,8 +30,10 @@ import serial.tools.list_ports
 # Fix UTF-8 console output trên Windows
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 try:
-    if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stdout, "reconfigure"):
+        getattr(sys.stdout, "reconfigure")(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        getattr(sys.stderr, "reconfigure")(encoding="utf-8", errors="replace")
 except Exception:
     pass
 
@@ -47,7 +49,7 @@ for p in [_root_dir, _robot_dir, _task3_dir, _this_dir]:
 
 # Import module Nhận dạng giọng nói
 try:
-    from voice_todo import (
+    from robot_huong_dan_vien.task3_voice.voice_todo import (
         MOTION_MAP,
         init_recognizer,
         get_microphone,
@@ -56,26 +58,36 @@ try:
         get_action
     )
 except ImportError:
-    from task3_voice.voice_todo import (
-        MOTION_MAP,
-        init_recognizer,
-        get_microphone,
-        record_audio,
-        recognize_speech_vietnamese,
-        get_action
-    )
+    try:
+        from task3_voice.voice_todo import (  # type: ignore
+            MOTION_MAP,
+            init_recognizer,
+            get_microphone,
+            record_audio,
+            recognize_speech_vietnamese,
+            get_action
+        )
+    except ImportError:
+        from voice_todo import (  # type: ignore
+            MOTION_MAP,
+            init_recognizer,
+            get_microphone,
+            record_audio,
+            recognize_speech_vietnamese,
+            get_action
+        )
 
 # Import module Tri thức Chăm Pa, AI Brain & Loa TTS
 try:
-    from core.knowledge_base import search_knowledge_base
-    from core.ai_brain import ask_gemini
-    from core.voice import speak
+    from robot_huong_dan_vien.core.knowledge_base import search_knowledge_base
+    from robot_huong_dan_vien.core.ai_brain import ask_gemini
+    from robot_huong_dan_vien.core.voice import speak
     _HAS_CHAMPA = True
 except Exception:
     try:
-        from robot_huong_dan_vien.core.knowledge_base import search_knowledge_base
-        from robot_huong_dan_vien.core.ai_brain import ask_gemini
-        from robot_huong_dan_vien.core.voice import speak
+        from core.knowledge_base import search_knowledge_base  # type: ignore
+        from core.ai_brain import ask_gemini  # type: ignore
+        from core.voice import speak  # type: ignore
         _HAS_CHAMPA = True
     except Exception:
         _HAS_CHAMPA = False
@@ -564,9 +576,9 @@ def start_voice_control(callback=None, stop_event=None, status_queue=None):
                     statue_num = detect_statue_command(user_query)
                     if statue_num and statue_num in STATUES_PRESENTATION:
                         statue_info = STATUES_PRESENTATION[statue_num]
-                        title = statue_info["title"]
-                        speech_content = statue_info["content"]
-                        duration = statue_info["duration"]
+                        title = str(statue_info["title"])
+                        speech_content = str(statue_info["content"])
+                        duration = float(statue_info["duration"])
 
                         print(f"\n>>> [KÍCH HOẠT LỆNH]: Di chuyển đến {title}")
                         put_status(f"🤖 Đang gửi lệnh di chuyển '{statue_num}' đến phần cứng...", "#38bdf8")

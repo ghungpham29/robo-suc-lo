@@ -281,18 +281,20 @@ def _synthesize_edge_tts_in_memory(text: str, voice: str = None, rate: str = "+8
     return None
 
 
-def _synthesize_kokoro_in_memory(text: str, voice: str = None, speed: float = 1.05) -> Optional["pygame.mixer.Sound"]:
+def _synthesize_kokoro_in_memory(text: str, voice: str = None, speed: float = None) -> Optional["pygame.mixer.Sound"]:
     """Tổng hợp âm thanh bằng Kokoro ONNX nạp trực tiếp vào RAM với cắt tỉa khoảng lặng."""
     if not _KOKORO_AVAILABLE or not text.strip():
         return None
+    target_v = (voice or CURRENT_VOICE).lower().strip()
+    actual_speed = speed if speed is not None else (1.20 if target_v == "mai_linh" else 1.05)
     try:
-        model = _get_kokoro_model(voice or CURRENT_VOICE)
+        model = _get_kokoro_model(target_v)
         if model is None:
             return None
-        audio_array, _ = model.synthesize(text, speed=speed)
+        audio_array, _ = model.synthesize(text, speed=actual_speed)
         if len(audio_array) > 0:
             # Cắt tỉa khoảng lặng thừa ở đầu và cuối để nối mượt mà sau dấu câu
-            trimmed_audio = _trim_silence_numpy(audio_array, threshold=0.008, pad_ms=35, sr=24000)
+            trimmed_audio = _trim_silence_numpy(audio_array, threshold=0.008, pad_ms=15, sr=24000)
             bio = io.BytesIO()
             sf.write(bio, trimmed_audio, 24000, format="WAV", subtype="PCM_16")
             bio.seek(0)
@@ -337,7 +339,12 @@ def _synthesize_sentence_sound(
     phonetic_text = to_speech_phonetics(sentence)
     sel_engine = (engine or TTS_ENGINE or "edge-tts").lower().strip()
     target_voice = voice or CURRENT_VOICE
-    actual_speed = speed or VOICE_SPEED
+    if speed is not None:
+        actual_speed = speed
+    elif target_voice == "mai_linh":
+        actual_speed = 1.20
+    else:
+        actual_speed = VOICE_SPEED
 
     sound = None
 
