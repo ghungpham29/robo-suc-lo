@@ -20,6 +20,10 @@ ROMAN_NUMERALS: Dict[str, str] = {
 
 # Từ điển ánh xạ phiên âm chuẩn cho từ mượn, tên di tích, thần thoại và tổ chức
 PHONETIC_DICTIONARY = [
+    # Tên Robot & Dự án
+    (r"\bKalepic\b", "Ca lê bit"),
+    (r"\bkalepic\b", "ca lê bit"),
+
     # Địa danh & Nền văn minh Chăm Pa
     (r"\bKhmer\b", "Khơ me"),
     (r"\bkhmer\b", "khơ me"),
@@ -76,6 +80,10 @@ PHONETIC_DICTIONARY = [
     (r"\bShiva\b", "Si va"),
     (r"\bshiva\b", "si va"),
     (r"\bVishnu\b", "Vít nu"),
+    (r"\bParvati\b", "Pác-va-ti"),
+    (r"\bMahishasura Mardini\b", "Ma-hi-sa-su-ra Mác-đi-ni"),
+    (r"\bMahishasura\b", "Ma-hi-sa-su-ra"),
+    (r"\bNataraja\b", "Na-ta-ra-gia"),
     (r"\bBhadresvara\b", "Bát-đrê-sva-ra"),
     (r"\bLaksmindra-Lokesvara\b", "Lắc-smin-đra Lô-kê-sva-ra"),
     (r"\bAvalokitesvara\b", "A-va-lô-ki-tê-sva-ra"),
@@ -91,6 +99,9 @@ PHONETIC_DICTIONARY = [
     (r"\bKala\b", "Ka la"),
     (r"\bMakara\b", "Ma-ka-ra"),
     (r"\bNaga\b", "Na-ga"),
+    (r"\bGajasimha\b", "Ga-gia-sim-ha"),
+    (r"\bHanuman\b", "Ha-nu-man"),
+    (r"\bUroja\b", "U-rô-gia"),
     (r"\bHamsa\b", "Ham sa"),
     (r"\bDevaraja\b", "Đê-va-ra-gia"),
     (r"\bTribhanga\b", "Tri-băng-ga"),

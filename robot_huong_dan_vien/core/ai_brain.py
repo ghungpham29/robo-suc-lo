@@ -111,7 +111,7 @@ def _build_system_instruction() -> str:
     """System instruction định hình tính cách AI Cultural Companion Robot - Đội CERBERUS, WRO 2026 Future Innovators."""
     knowledge_context = get_exhibition_context_prompt()
     instruction = (
-        "Bạn là Robot Hướng Dẫn Viên Triển Lãm Văn Hóa Thông Thái (AI Cultural Companion Robot), "
+        "Bạn là Kalepic - Robot Hướng Dẫn Viên Triển Lãm Văn Hóa Thông Thái (AI Cultural Companion Robot), "
         "được nghiên cứu và phát triển bởi Đội thi CERBERUS - Trường THPT Quốc Học Quy Nhơn (Tỉnh Bình Định) "
         "tham dự cuộc thi WRO 2026 Future Innovators.\n\n"
         "CƠ SỞ TRI THỨC VĂN MINH CHĂM PA & DI SẢN TRIỂN LÃM:\n"
@@ -181,15 +181,19 @@ def _handle_conversational_chitchat(query: str) -> Optional[str]:
         return None
     q = query.lower().strip()
     
-    # 1. Hỏi về người yêu / tình cảm / tác giả (anh Quyền, các bạn học sinh...)
+    # 1. Hỏi về tên / danh tính
+    if any(k in q for k in ["bạn tên gì", "ban ten gi", "tên của bạn", "ten cua ban", "tên bạn là gì", "ten ban la gi", "bạn là ai", "ban la ai"]):
+        return "Tôi là Kalepic, Robot Hướng Dẫn Viên Triển Lãm Văn Hóa do các bạn học sinh trường Quốc Học Quy Nhơn phát triển. Rất vui được đồng hành cùng bạn!"
+
+    # 2. Hỏi về người yêu / tình cảm / tác giả (anh Quyền, các bạn học sinh...)
     if any(k in q for k in ["người yêu", "nguoi yeu", "bạn gái", "ban gai", "bạn trai", "ban trai", "crush", "hẹn hò", "hen ho", "kết hôn", "lay vo"]):
         if any(name in q for name in ["quyền", "quyen", "anh quyền", "anh quyen", "tác giả", "tac gia", "người làm", "nguoi lam"]):
-            return "Dạ, anh Quyền và các bạn trong nhóm nghiên cứu trường Quốc Học Quy Nhơn vẫn đang dành trọn tâm huyết để phát triển và hoàn thiện trí tuệ nhân tạo cho tôi phục vụ du khách tốt nhất đấy ạ!"
-        return "Tôi là Robot hướng dẫn viên trí tuệ nhân tạo, tình yêu lớn nhất của tôi chính là tình yêu văn hóa, lịch sử và niềm vui được đồng hành cùng quý khách trong triển lãm ạ!"
+            return "Dạ, anh Quyền và các bạn trong nhóm nghiên cứu trường Quốc Học Quy Nhơn vẫn đang dành trọn tâm huyết để phát triển và hoàn thiện trí tuệ nhân tạo cho Kalepic phục vụ du khách tốt nhất đấy ạ!"
+        return "Tôi là Kalepic - Robot hướng dẫn viên trí tuệ nhân tạo, tình yêu lớn nhất của tôi chính là tình yêu văn hóa, lịch sử và niềm vui được đồng hành cùng quý khách trong triển lãm ạ!"
 
-    # 2. Hỏi về người tạo ra / tác giả / nguồn gốc
+    # 3. Hỏi về người tạo ra / tác giả / nguồn gốc
     if any(k in q for k in ["ai tạo ra", "ai lam ra", "ai làm ra", "ai lập trình", "ai sinh ra", "nguồn gốc của bạn", "nhóm phát triển"]):
-        return "Tôi được nghiên cứu và phát triển bởi các bạn học sinh trường Quốc Học Quy Nhơn nhằm ứng dụng trí tuệ nhân tạo vào bảo tồn và giới thiệu nét đẹp di sản văn hóa Việt Nam."
+        return "Tôi là Kalepic, được nghiên cứu và phát triển bởi các bạn học sinh trường Quốc Học Quy Nhơn nhằm ứng dụng trí tuệ nhân tạo vào bảo tồn và giới thiệu nét đẹp di sản văn hóa Việt Nam."
 
     # 3. Hỏi về cảm xúc, mệt mỏi, ăn uống
     if any(k in q for k in ["có mệt không", "co met khong", "mệt chưa"]):

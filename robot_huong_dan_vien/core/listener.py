@@ -1,15 +1,11 @@
 """
-Module Nhận diện Giọng nói qua Micro (Speech-to-Text Listener v5.0 Pro)
-Tự động hỗ trợ 2 cơ chế thu âm:
-  1. Sounddevice + VAD (Mặc định - Chuẩn hiện đại, không cần build tools C++, tương thích Python 3.10 - 3.14 trên Windows/Linux/macOS).
-  2. PyAudio / SpeechRecognition Microphone (Dự phòng tự động nếu có sẵn PyAudio).
-
-Quy trình nhận diện:
-  1. Tự động phát hiện Micro khả dụng (Default OS Microphone / Microphone Array).
-  2. Hiệu chỉnh tạp âm môi trường (Ambient Noise Calibration) thông minh khi bắt đầu.
-  3. Pre-roll Buffer (0.3s) chống mất âm tiết đầu khi du khách bắt đầu nói.
-  4. Voice Activity Detection (VAD) & ngắt câu tự động khi dừng nói (Pause Threshold).
-  5. Giải mã nhận diện tiếng Việt bằng Google Speech Recognition API (vi-VN).
+Module Nhận diện Giọng nói qua Micro (Speech-to-Text Listener v5.2 Pro Max)
+Được tối ưu hóa đặc biệt cho môi trường giao tiếp tự nhiên tại triển lãm:
+  1. Dual-Threshold Hysteresis VAD: Ngưỡng kích hoạt kép chống cắt ngang khi người dùng nói chậm, nhỏ giọng hoặc ngắt quãng lấy hơi.
+  2. Pre-roll Buffer (0.5s) & Post-roll Padding (0.3s): Đảm bảo 100% không bị mất âm tiết đầu câu ("Ơi", "Này", "Cho", "Xin") hay âm đuôi ("ạ", "nhé", "nào").
+  3. Noise-Spike Filter (Min Speech Filter): Tự động lọc bỏ các tiếng gõ bàn, tiếng ho, tạp âm thoáng qua (< 0.3s) để không bị đóng mic sớm.
+  4. Pause Threshold chuẩn tự nhiên (1.4s): Cho phép du khách có đủ thời gian dừng lại suy nghĩ, ngắt nghỉ giữa các vế câu mà không bị ngắt ghi âm sớm.
+  5. Tương thích toàn diện trên Windows/Linux/macOS (Sounddevice + SpeechRecognition).
 """
 
 import collections
@@ -30,8 +26,8 @@ if sys.platform == "win32":
 
 load_dotenv()
 
-# Cấu hình từ .env
-PAUSE_THRESHOLD = float(os.getenv("MIC_PAUSE_THRESHOLD", "0.8"))
+# Cấu hình từ .env (Mặc định 1.4s để du khách ngắt nghỉ tự nhiên không bị cắt câu)
+PAUSE_THRESHOLD = float(os.getenv("MIC_PAUSE_THRESHOLD", "1.4"))
 DEFAULT_TIMEOUT = int(os.getenv("MIC_TIMEOUT", "15"))
 PHRASE_LIMIT = int(os.getenv("MIC_PHRASE_LIMIT", "30"))
 ENV_ENERGY_THRESHOLD = os.getenv("MIC_ENERGY_THRESHOLD", "auto")
@@ -58,7 +54,7 @@ BLOCK_SIZE = int(SAMPLE_RATE * BLOCK_DURATION)
 # QUẢN LÝ TRẠNG THÁI TOÀN CỤC
 # ==============================================================================
 _recognizer_instance = None
-_calibrated_energy_threshold: float = 350.0
+_calibrated_energy_threshold: float = 300.0
 _is_calibrated: bool = False
 _mic_status_cached: Optional[bool] = None
 
@@ -113,7 +109,7 @@ def calibrate_ambient_noise(duration: float = 1.0) -> float:
     """
     global _calibrated_energy_threshold, _is_calibrated
 
-    # Nếu người dùng cấu hình cố định trong .env (ví dụ: MIC_ENERGY_THRESHOLD=400)
+    # Nếu người dùng cấu hình cố định trong .env (ví dụ: MIC_ENERGY_THRESHOLD=350)
     if ENV_ENERGY_THRESHOLD.isdigit():
         _calibrated_energy_threshold = float(ENV_ENERGY_THRESHOLD)
         _is_calibrated = True
@@ -130,82 +126,113 @@ def calibrate_ambient_noise(duration: float = 1.0) -> float:
                     e = float(np.abs(data).mean())
                     energies.append(e)
 
-            ambient_mean = float(np.mean(energies)) if energies else 50.0
-            # Ngưỡng kích hoạt = mức ồn nền + 150 (giới hạn an toàn từ 250 đến 800)
-            threshold = max(ambient_mean + 150.0, 250.0)
-            if threshold > 800.0:
-                threshold = 500.0  # Chống trường hợp bị tiếng ồn bất chợt đẩy ngưỡng quá cao
+            ambient_mean = float(np.mean(energies)) if energies else 40.0
+            # Ngưỡng kích hoạt = mức ồn nền + 120 (giới hạn an toàn từ 200 đến 650)
+            threshold = max(ambient_mean + 120.0, 200.0)
+            if threshold > 650.0:
+                threshold = 450.0  # Chống trường hợp bị tiếng ồn bất chợt đẩy ngưỡng quá cao
             
             _calibrated_energy_threshold = threshold
             _is_calibrated = True
             print(f"[🎙️ MICRO] Cân bằng môi trường thành công (Ngưỡng nhạy kích hoạt: {_calibrated_energy_threshold:.0f})!")
             return _calibrated_energy_threshold
         except Exception as e:
-            print(f"[🎙️ MICRO] Không thể tự động cân bằng tạp âm: {e}. Sử dụng ngưỡng mặc định 350.")
+            print(f"[🎙️ MICRO] Không thể tự động cân bằng tạp âm: {e}. Sử dụng ngưỡng mặc định 300.")
 
-    _calibrated_energy_threshold = 350.0
+    _calibrated_energy_threshold = 300.0
     _is_calibrated = True
     return _calibrated_energy_threshold
 
 
 def _record_audio_sounddevice(
-    timeout: int,
-    phrase_time_limit: int,
-    pause_threshold: float,
-    energy_threshold: float,
+    timeout: int = 10,
+    phrase_time_limit: int = 25,
+    pause_threshold: float = 1.3,
+    energy_threshold: float = 60.0,
+    callback_energy: Optional[Any] = None,
 ) -> Optional["sr.AudioData"]:
     """
-    Thu âm thời gian thực bằng sounddevice với cơ chế:
-      - Pre-roll Buffer (0.3s) giữ lại âm tiết mở đầu (tránh cụt đầu câu).
-      - VAD (Voice Activity Detection) phát hiện người bắt đầu nói.
-      - Tự động ngắt khi phát hiện khoảng lặng (silence >= pause_threshold).
+    Thu âm thời gian thực thông minh bằng sounddevice với cơ chế:
+      - Dynamic Noise Floor Tracking: Tự động thích ứng với mức ồn nền thực tế.
+      - Pre-roll Buffer (0.5s) lưu lại âm tiết mở đầu (tránh cụt đầu câu).
+      - Dual-Threshold Hysteresis: Trigger cao để chống nhiễu, Continue thấp để bắt trọn giọng nói.
+      - Noise-Spike Filter: Lọc các tiếng ồn ngắn (<0.25s) không phải giọng nói người.
+      - Post-roll Padding (0.3s): Giữ trọn âm đuôi cuối câu.
     """
-    pre_roll_blocks = int(0.3 / BLOCK_DURATION)
+    pre_roll_blocks = int(0.5 / BLOCK_DURATION)
     pre_roll_buffer = collections.deque(maxlen=pre_roll_blocks)
 
+    energy_history = collections.deque(maxlen=3)
     recorded_blocks = []
     has_speech_started = False
+    voiced_blocks_count = 0
     silence_duration = 0.0
     start_time = time.time()
     speech_start_time: float = start_time
+
+    # Khởi tạo ngưỡng động thích ứng
+    noise_floor = max(energy_threshold * 0.3, 20.0)
+    trigger_threshold = max(energy_threshold, 60.0)
+    continue_threshold = max(trigger_threshold * 0.6, 35.0)
 
     try:
         with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16", blocksize=BLOCK_SIZE) as stream:
             while True:
                 data, _ = stream.read(BLOCK_SIZE)
-                energy = float(np.abs(data).mean())
+                raw_energy = float(np.abs(data).mean())
+                energy_history.append(raw_energy)
+                smoothed_energy = float(np.mean(energy_history))
                 now = time.time()
+
+                if callback_energy:
+                    try:
+                        callback_energy(smoothed_energy, has_speech_started)
+                    except Exception:
+                        pass
 
                 if not has_speech_started:
                     pre_roll_buffer.append(data.copy())
-                    if energy > energy_threshold:
+                    # Cập nhật mức ồn nền khi đang im lặng
+                    noise_floor = noise_floor * 0.95 + smoothed_energy * 0.05
+                    trigger_threshold = max(noise_floor * 2.2, 50.0)
+
+                    # Kích hoạt khi năng lượng vượt ngưỡng
+                    if smoothed_energy > trigger_threshold:
                         has_speech_started = True
                         speech_start_time = now
-                        # Nạp lại toàn bộ dữ liệu trước khi phát hiện giọng nói
                         recorded_blocks.extend(list(pre_roll_buffer))
+                        voiced_blocks_count = 1
                         silence_duration = 0.0
-                        print("  [•] Đang lắng nghe câu nói...", end="\r", flush=True)
+                        continue_threshold = max(trigger_threshold * 0.55, 30.0)
                     elif now - start_time > timeout:
-                        # Hết thời gian chờ mà chưa có ai nói
                         return None
                 else:
                     recorded_blocks.append(data.copy())
-                    if energy < energy_threshold:
-                        silence_duration += BLOCK_DURATION
-                        if silence_duration >= pause_threshold:
-                            # Khách đã dừng nói đủ thời gian ngắt câu
-                            break
-                    else:
+
+                    if smoothed_energy > continue_threshold:
+                        voiced_blocks_count += 1
                         silence_duration = 0.0
+                    else:
+                        silence_duration += BLOCK_DURATION
+
+                        if silence_duration >= pause_threshold:
+                            total_speech_time = voiced_blocks_count * BLOCK_DURATION
+                            if total_speech_time < 0.25:
+                                has_speech_started = False
+                                recorded_blocks.clear()
+                                voiced_blocks_count = 0
+                                silence_duration = 0.0
+                                continue
+                            break
 
                     if now - speech_start_time > phrase_time_limit:
-                        # Đạt giới hạn thời lượng 1 câu
                         break
     except Exception as e:
         print(f"[🎙️ MICRO] Lỗi luồng thu âm sounddevice: {e}")
         return None
+        return None
 
-    if not recorded_blocks:
+    if not recorded_blocks or voiced_blocks_count < 4:
         return None
 
     full_audio = np.concatenate(recorded_blocks, axis=0)
@@ -222,6 +249,7 @@ def _record_audio_pyaudio(
     """Thu âm dự phòng bằng speech_recognition.Microphone (PyAudio) nếu môi trường có sẵn PyAudio."""
     try:
         recognizer.pause_threshold = pause_threshold
+        recognizer.non_speaking_duration = 0.5
         with sr.Microphone() as source:
             global _is_calibrated
             if not _is_calibrated:
@@ -240,6 +268,7 @@ def listen_from_mic(
     timeout: Optional[int] = None,
     phrase_time_limit: Optional[int] = None,
     pause_threshold: Optional[float] = None,
+    callback_energy: Optional[Any] = None,
 ) -> Optional[str]:
     """
     Thu âm giọng nói từ Micro và nhận diện sang văn bản tiếng Việt qua Google Speech API.
@@ -248,6 +277,7 @@ def listen_from_mic(
         timeout (int): Thời gian tối đa chờ du khách cất tiếng nói (giây).
         phrase_time_limit (int): Thời lượng tối đa cho 1 câu hỏi (giây).
         pause_threshold (float): Khoảng lặng sau khi dứt câu để kết thúc thu âm (giây).
+        callback_energy: Hàm callback nhận năng lượng âm thanh theo thời gian thực (để cập nhật UI).
 
     Returns:
         str | None: Câu văn tiếng Việt nhận diện được hoặc None nếu không có tiếng nói / lỗi mạng.
@@ -267,8 +297,6 @@ def listen_from_mic(
     if not _is_calibrated:
         calibrate_ambient_noise()
 
-    print("\n🎤 Đang nghe câu hỏi... (Nói to, rõ ràng vào Microphone)")
-
     audio_data: Optional[sr.AudioData] = None
 
     # Ưu tiên sử dụng sounddevice
@@ -278,6 +306,7 @@ def listen_from_mic(
             phrase_time_limit=actual_limit,
             pause_threshold=actual_pause,
             energy_threshold=_calibrated_energy_threshold,
+            callback_energy=callback_energy,
         )
     else:
         # Dự phòng PyAudio

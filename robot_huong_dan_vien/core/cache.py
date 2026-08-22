@@ -20,20 +20,20 @@ except ImportError:
 # Bảng băm các câu hỏi cơ bản và câu trả lời chuẩn mực
 STATIC_CACHE: dict[str, str] = {
     # Nhóm câu hỏi Chào hỏi
-    "xin chao": "Xin chào quý khách! Tôi là robot hướng dẫn viên triển lãm văn hóa. Rất hân hạnh được đồng hành cùng bạn hôm nay.",
-    "xin chào": "Xin chào quý khách! Tôi là robot hướng dẫn viên triển lãm văn hóa. Rất hân hạnh được đồng hành cùng bạn hôm nay.",
-    "chao ban": "Chào bạn! Chúc bạn có một chuyến tham quan triển lãm thật thú vị và bổ ích.",
-    "chào bạn": "Chào bạn! Chúc bạn có một chuyến tham quan triển lãm thật thú vị và bổ ích.",
-    "hello": "Xin chào! Tôi có thể giúp gì cho bạn trong chuyến tham quan văn hóa hôm nay?",
-    "hi robot": "Xin chào! Rất vui được đón tiếp quý khách đến với không gian triển lãm.",
+    "xin chao": "Xin chào quý khách! Tôi là Kalepic, robot hướng dẫn viên triển lãm văn hóa. Rất hân hạnh được đồng hành cùng bạn hôm nay.",
+    "xin chào": "Xin chào quý khách! Tôi là Kalepic, robot hướng dẫn viên triển lãm văn hóa. Rất hân hạnh được đồng hành cùng bạn hôm nay.",
+    "chao ban": "Chào bạn! Tôi là Kalepic, chúc bạn có một chuyến tham quan triển lãm thật thú vị và bổ ích.",
+    "chào bạn": "Chào bạn! Tôi là Kalepic, chúc bạn có một chuyến tham quan triển lãm thật thú vị và bổ ích.",
+    "hello": "Xin chào! Tôi là Kalepic, tôi có thể giúp gì cho bạn trong chuyến tham quan văn hóa hôm nay?",
+    "hi robot": "Xin chào! Tôi là Kalepic, rất vui được đón tiếp quý khách đến với không gian triển lãm.",
 
     # Nhóm câu hỏi Danh tính / Giới thiệu
-    "ban ten gi": "Tôi là Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, được phát triển bởi các bạn học sinh trường Quốc Học Quy Nhơn để giới thiệu nét đẹp di sản.",
-    "bạn tên gì": "Tôi là Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, được phát triển bởi các bạn học sinh trường Quốc Học Quy Nhơn để giới thiệu nét đẹp di sản.",
-    "ban la ai": "Tôi là Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các hiện vật lịch sử và văn hóa.",
-    "bạn là ai": "Tôi là Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các hiện vật lịch sử và văn hóa.",
-    "gioi thieu ban than": "Tôi là robot hướng dẫn viên trí tuệ nhân tạo, có nhiệm vụ thuyết minh về các di tích và hiện vật văn hóa tiêu biểu.",
-    "giới thiệu bản thân": "Tôi là robot hướng dẫn viên trí tuệ nhân tạo, có nhiệm vụ thuyết minh về các di tích và hiện vật văn hóa tiêu biểu.",
+    "ban ten gi": "Tôi là Kalepic - Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, được phát triển bởi các bạn học sinh trường Quốc Học Quy Nhơn để giới thiệu nét đẹp di sản.",
+    "bạn tên gì": "Tôi là Kalepic - Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, được phát triển bởi các bạn học sinh trường Quốc Học Quy Nhơn để giới thiệu nét đẹp di sản.",
+    "ban la ai": "Tôi là Kalepic - Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các hiện vật lịch sử và văn hóa.",
+    "bạn là ai": "Tôi là Kalepic - Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các hiện vật lịch sử và văn hóa.",
+    "gioi thieu ban than": "Tôi là Kalepic, robot hướng dẫn viên trí tuệ nhân tạo, có nhiệm vụ thuyết minh về các di tích và hiện vật văn hóa tiêu biểu.",
+    "giới thiệu bản thân": "Tôi là Kalepic, robot hướng dẫn viên trí tuệ nhân tạo, có nhiệm vụ thuyết minh về các di tích và hiện vật văn hóa tiêu biểu.",
 
     # Nhóm câu hỏi Tiện ích triển lãm & Bảo tàng
     "gio mo cua": "Triển lãm mở cửa đón du khách tham quan từ 7 giờ 30 sáng đến 17 giờ chiều tất cả các ngày trong tuần.",
@@ -54,12 +54,12 @@ STATIC_CACHE: dict[str, str] = {
     "cảm ơn bạn": "Rất hân hạnh được phục vụ bạn! Chúc bạn tiếp tục có những trải nghiệm tuyệt vời tại triển lãm.",
 
     # Nhóm câu hỏi Chào hỏi & Giới thiệu kết hợp
-    "xin chao ban la ai": "Xin chào quý khách! Tôi là Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các di tích và hiện vật lịch sử.",
-    "xin chào bạn là ai": "Xin chào quý khách! Tôi là Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các di tích và hiện vật lịch sử.",
-    "ban co the lam gi": "Tôi có thể thuyết minh chi tiết về các di tích tháp Chăm Pa, thần thoại Ấn Độ giáo, không gian cồng chiêng Tây Nguyên, trống đồng Đông Sơn và giải đáp các thắc mắc của quý khách.",
-    "bạn có thể làm gì": "Tôi có thể thuyết minh chi tiết về các di tích tháp Chăm Pa, thần thoại Ấn Độ giáo, không gian cồng chiêng Tây Nguyên, trống đồng Đông Sơn và giải đáp các thắc mắc của quý khách.",
-    "giup gi duoc cho toi": "Tôi có thể hỗ trợ thuyết minh thông tin lịch sử các hiện vật triển lãm và hướng dẫn tham quan cho quý khách.",
-    "giúp gì được cho tôi": "Tôi có thể hỗ trợ thuyết minh thông tin lịch sử các hiện vật triển lãm và hướng dẫn tham quan cho quý khách.",
+    "xin chao ban la ai": "Xin chào quý khách! Tôi là Kalepic - Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các di tích và hiện vật lịch sử.",
+    "xin chào bạn là ai": "Xin chào quý khách! Tôi là Kalepic - Robot Hướng Dẫn Viên Triển Lãm Văn Hóa, người bạn đồng hành thuyết minh các di tích và hiện vật lịch sử.",
+    "ban co the lam gi": "Tôi là Kalepic, tôi có thể thuyết minh chi tiết về các di tích tháp Chăm Pa, thần thoại Ấn Độ giáo, không gian cồng chiêng Tây Nguyên, trống đồng Đông Sơn và giải đáp các thắc mắc của quý khách.",
+    "bạn có thể làm gì": "Tôi là Kalepic, tôi có thể thuyết minh chi tiết về các di tích tháp Chăm Pa, thần thoại Ấn Độ giáo, không gian cồng chiêng Tây Nguyên, trống đồng Đông Sơn và giải đáp các thắc mắc của quý khách.",
+    "giup gi duoc cho toi": "Tôi là Kalepic, tôi có thể hỗ trợ thuyết minh thông tin lịch sử các hiện vật triển lãm và hướng dẫn tham quan cho quý khách.",
+    "giúp gì được cho tôi": "Tôi là Kalepic, tôi có thể hỗ trợ thuyết minh thông tin lịch sử các hiện vật triển lãm và hướng dẫn tham quan cho quý khách.",
 }
 
 # Bộ nhớ đệm động LRU lưu trữ các câu trả lời gần đây (Tối đa 150 câu)

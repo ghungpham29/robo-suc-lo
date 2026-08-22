@@ -37,7 +37,7 @@ KOKORO_VOICES: Dict[str, str] = {
 }
 
 # Cấu hình từ .env
-TTS_ENGINE = os.getenv("TTS_ENGINE", "kokoro").lower().strip()
+TTS_ENGINE = os.getenv("TTS_ENGINE", "edge-tts").lower().strip()
 CURRENT_VOICE = os.getenv("KOKORO_VOICE", "mai_linh").lower().strip()
 KOKORO_DEVICE = os.getenv("KOKORO_DEVICE", "cpu").lower().strip()
 VOICE_SPEED = float(os.getenv("VOICE_SPEED", "1.05"))
@@ -325,34 +325,43 @@ def _synthesize_sentence_sound(
     speed: float = None,
 ) -> Optional["pygame.mixer.Sound"]:
     """
-    Tổng hợp một câu đơn thành đối tượng Pygame Sound trên RAM với đa tầng Fallback:
-    Tầng 1: Động cơ chỉ định (edge-tts / kokoro)
-    Tầng 2: Edge-TTS
-    Tầng 3: Kokoro ONNX
-    Tầng 4: gTTS
+    Tổng hợp văn bản thành đối tượng Pygame Sound trên RAM:
+    Ưu tiên 1: Edge-TTS Neural Voice (mượt mà, tự nhiên, không ngắt quãng)
+    Ưu tiên 2: Kokoro ONNX
+    Ưu tiên 3: gTTS
     """
     if not sentence or not sentence.strip():
         return None
 
     # Áp dụng chuẩn hóa ngữ âm ngầm
     phonetic_text = to_speech_phonetics(sentence)
-    sel_engine = (engine or TTS_ENGINE).lower().strip()
+    sel_engine = (engine or TTS_ENGINE or "edge-tts").lower().strip()
     target_voice = voice or CURRENT_VOICE
     actual_speed = speed or VOICE_SPEED
 
     sound = None
 
-    if sel_engine == "kokoro" and _KOKORO_AVAILABLE:
+    # 1. Ưu tiên Edge-TTS nếu engine yêu cầu hoặc mặc định
+    if _EDGE_TTS_AVAILABLE and sel_engine in ["edge-tts", "edge", "neural"]:
+        edge_v = target_voice if "Neural" in target_voice else EDGE_VOICE
+        rate_str = f"{int((actual_speed - 1.0) * 100):+d}%" if actual_speed != 1.0 else "+8%"
+        sound = _synthesize_edge_tts_in_memory(phonetic_text, voice=edge_v, rate=rate_str)
+
+    # 2. Thử Kokoro nếu được chỉ định
+    if sound is None and sel_engine == "kokoro" and _KOKORO_AVAILABLE:
         sound = _synthesize_kokoro_in_memory(phonetic_text, voice=target_voice, speed=actual_speed)
 
+    # 3. Fallback sang Edge-TTS
     if sound is None and _EDGE_TTS_AVAILABLE:
         edge_v = target_voice if "Neural" in target_voice else EDGE_VOICE
         rate_str = f"{int((actual_speed - 1.0) * 100):+d}%" if actual_speed != 1.0 else "+8%"
         sound = _synthesize_edge_tts_in_memory(phonetic_text, voice=edge_v, rate=rate_str)
 
+    # 4. Fallback sang Kokoro
     if sound is None and _KOKORO_AVAILABLE:
         sound = _synthesize_kokoro_in_memory(phonetic_text, voice=target_voice, speed=actual_speed)
 
+    # 5. Fallback sang gTTS
     if sound is None and _GTTS_AVAILABLE:
         sound = _synthesize_gtts_in_memory(phonetic_text)
 
@@ -374,7 +383,7 @@ class SpeechStreamPipeline:
 
     def __init__(self, voice: str = None, engine: str = None, speed: float = None):
         self.voice = voice or CURRENT_VOICE
-        self.engine = (engine or TTS_ENGINE).lower()
+        self.engine = (engine or TTS_ENGINE or "edge-tts").lower()
         self.speed = speed or VOICE_SPEED
         
         self._text_buffer = ""
@@ -413,20 +422,14 @@ class SpeechStreamPipeline:
         return False
 
     def feed_token(self, token: str) -> None:
-        """
-        Nhận từng token từ luồng LLM stream, kích hoạt phát âm thanh NGAY LẬP TỨC:
-        - Câu đầu tiên: ngắt ngay từ 2-3 từ đầu tiên hoặc dấu phẩy/chấm đầu tiên (<150ms) để Robot cất tiếng nói tức thì.
-        - Các câu tiếp theo: gom đủ cụm (>= 6-8 từ) để gối đầu âm thanh liên tục không khoảng lặng.
-        """
+        """Nhận từng token từ luồng LLM stream."""
         if self._stop_event.is_set() or not token:
             return
 
         self._text_buffer += token
 
-        # Nếu chưa gửi chunk đầu tiên -> ưu tiên tối đa tốc độ phản hồi tức thì
         if not self._first_chunk_sent:
             words = self._text_buffer.split()
-            # Ngắt ngay khi gặp dấu câu bất kỳ (. , ! ? ; : \n) với >= 2 từ, hoặc khi đã gom đủ >= 3 từ
             punct_match = re.search(r"([.!?,\n;:]+)\s+", self._text_buffer)
             if punct_match and len(words) >= 2:
                 split_idx = punct_match.end()
@@ -436,7 +439,6 @@ class SpeechStreamPipeline:
                 self._sentence_queue.put(candidate)
                 return
             elif len(words) >= 4:
-                # Cắt 3 từ đầu tiên để phát ngay lập tức
                 split_idx = self._text_buffer.find(words[2]) + len(words[2])
                 candidate = self._text_buffer[:split_idx].strip()
                 self._text_buffer = self._text_buffer[split_idx:].lstrip()
@@ -444,65 +446,39 @@ class SpeechStreamPipeline:
                 self._sentence_queue.put(candidate)
                 return
 
-        # Các chunk tiếp theo: ngắt theo câu kết thúc [.!?\n] hoặc cụm từ dài
         match = re.search(r"([.!?\n]+)\s+", self._text_buffer)
         if match:
             split_idx = match.end()
             candidate = self._text_buffer[:split_idx].strip()
-            word_count = len(candidate.split())
-            if word_count >= 6 or self._input_finished.is_set():
-                self._text_buffer = self._text_buffer[split_idx:]
+            self._text_buffer = self._text_buffer[split_idx:]
+            if candidate:
                 self._sentence_queue.put(candidate)
-        else:
-            words = self._text_buffer.split()
-            if len(words) >= 14:
-                comma_match = re.search(r"([,;:]+)\s+", self._text_buffer)
-                if comma_match and comma_match.end() > 20:
-                    split_idx = comma_match.end()
-                    candidate = self._text_buffer[:split_idx].strip()
-                    self._text_buffer = self._text_buffer[split_idx:]
-                    self._sentence_queue.put(candidate)
 
     def feed_sentence(self, sentence: str) -> None:
-        """Nạp trực tiếp một câu hoàn chỉnh vào hàng đợi tổng hợp."""
-        if self._stop_event.is_set() or not sentence or not sentence.strip():
+        if self._stop_event.is_set() or not sentence.strip():
             return
         self._sentence_queue.put(sentence.strip())
 
     def finish(self) -> None:
-        """Báo hiệu đã kết thúc dòng token đầu vào từ LLM."""
-        if self._stop_event.is_set():
-            return
-        # Đẩy phần text còn sót lại trong buffer vào hàng đợi
-        remaining = self._text_buffer.strip()
-        if remaining:
-            self._sentence_queue.put(remaining)
+        if self._text_buffer.strip() and not self._stop_event.is_set():
+            self._sentence_queue.put(self._text_buffer.strip())
             self._text_buffer = ""
         self._input_finished.set()
-        self._sentence_queue.put(None)  # Ký hiệu kết thúc (Sentinel)
-
-    def wait_until_done(self, timeout: float = 60.0) -> None:
-        """Chờ tất cả các câu được tổng hợp và phát xong hoàn toàn ra Loa."""
-        start_time = time.time()
-        while self.is_active():
-            if time.time() - start_time > timeout:
-                break
-            time.sleep(0.02)
-        self.stop()
 
     def stop(self) -> None:
-        """Hủy lập tức pipeline và dừng phát âm thanh."""
         self._stop_event.set()
         self._input_finished.set()
-        
-        # Xóa các hàng đợi
+        if _PYGAME_AVAILABLE and pygame.mixer.get_init():
+            try:
+                pygame.mixer.stop()
+            except Exception:
+                pass
         while not self._sentence_queue.empty():
             try:
                 self._sentence_queue.get_nowait()
                 self._sentence_queue.task_done()
             except Exception:
                 break
-
         while not self._audio_queue.empty():
             try:
                 self._audio_queue.get_nowait()
@@ -510,18 +486,15 @@ class SpeechStreamPipeline:
             except Exception:
                 break
 
-        try:
-            if _PYGAME_AVAILABLE and pygame.mixer.get_init():
-                pygame.mixer.stop()
-        except Exception:
-            pass
-
-        with _audio_lock:
-            if self in _active_pipelines:
-                _active_pipelines.remove(self)
+    def wait_until_done(self, timeout: float = 120.0) -> None:
+        start_t = time.time()
+        while self.is_active() and not self._stop_event.is_set():
+            if time.time() - start_t > timeout:
+                self.stop()
+                break
+            time.sleep(0.05)
 
     def _synthesizer_worker(self) -> None:
-        """Luồng tổng hợp âm thanh nền: lấy từng câu text -> tạo pygame Sound -> đẩy sang player."""
         while not self._stop_event.is_set():
             try:
                 sentence = self._sentence_queue.get(timeout=0.05)
@@ -532,8 +505,8 @@ class SpeechStreamPipeline:
                 continue
 
             if sentence is None:
-                self._audio_queue.put(None)
                 self._sentence_queue.task_done()
+                self._audio_queue.put(None)
                 break
 
             try:
@@ -588,12 +561,11 @@ class SpeechStreamPipeline:
 
 
 def create_speech_pipeline(voice: str = None, engine: str = None, speed: float = None) -> SpeechStreamPipeline:
-    """Tạo và khởi chạy một SpeechStreamPipeline mới để nhận token thời gian thực."""
     return SpeechStreamPipeline(voice=voice, engine=engine, speed=speed)
 
 
 # =============================================================================
-# HÀM PHÁT ÂM THANH CHUẨN SPEAK (TỰ ĐỘNG CẮT CÂU & PHÁT GỐI ĐẦU TRÊN RAM)
+# HÀM PHÁT ÂM THANH CHUẨN SPEAK (TỰ ĐỘNG PHÁT LIỀN MẠCH KHÔNG NGẮT QUÃNG)
 # =============================================================================
 
 def speak(
@@ -604,17 +576,7 @@ def speak(
     speed: float = None,
     is_async: bool = False,
 ) -> None:
-    """
-    Chuyển văn bản thành giọng nói tiếng Việt với cơ chế In-Memory Streaming Queue siêu tốc.
-    
-    Args:
-        text: Nội dung văn bản cần đọc.
-        play_alert: Có phát chuông thông báo nhẹ trước khi nói hay không.
-        voice: Tên giọng đọc cụ thể (nếu muốn ghi đè).
-        engine: Công cụ đọc (edge-tts / kokoro / gtts).
-        speed: Tốc độ đọc.
-        is_async: Nếu True, sẽ phát âm thanh ở luồng nền không chặn giao diện (Non-blocking).
-    """
+    """Chuyển văn bản thành giọng nói tiếng Việt mượt mà, không ngắt quãng sau dấu câu."""
     if not text or not text.strip():
         return
 

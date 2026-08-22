@@ -2,13 +2,16 @@
  * =========================================================================================
  * DỰ ÁN: ROBOT HƯỚNG DẪN VIÊN TRIỂN LÃM VĂN HÓA
  * PHẦN CỨNG: Bo mạch MATRIX Mini R4 (Bộ Matrix Future Innovators)
- * FILE: arduino_matrix_mini_r4.ino (Firmware Điều khiển Cảm biến & Cơ cấu Chấp hành)
+ * FILE: pipisikidi.ino (Firmware Điều khiển Cảm biến & Cơ cấu Chấp hành)
  * TỐC ĐỘ SERIAL: 115200 bps
  * =========================================================================================
  * MÔ TẢ HỆ THỐNG:
  * - Bo mạch đóng vai trò làm "Giác quan & Tay chân", truyền nhận dữ liệu với PC qua Serial.
  * - Đầu vào: 1 x PIR Sensor (Cổng D1), 1 x Laser Sensor MXLaserV2 (Cổng I2C1).
- * - Đầu ra: 4 x Động cơ DC di chuyển (M1, M2 bánh sau; M3, M4 bánh trước), 2 x Micro Servo (RC1, RC2).
+ * - Đầu ra: 2 x Động cơ DC di chuyển (M1, M2), 2 x Micro Servo (RC1, RC2).
+ * - DI CHUYỂN: Robot di chuyển theo các lộ trình "tượng" định sẵn (Tượng 1 - Tượng 11).
+ *   Gửi số thứ tự tượng (1 - 11) qua Serial để chạy lộ trình tương ứng.
+ * - CỬ CHỈ: Các lệnh ký tự (P, W, D, T) điều khiển 2 cánh tay Servo như cũ.
  * =========================================================================================
  */
 
@@ -29,12 +32,10 @@ const int SERVO2_PRESENT_ANGLE = 0;     // Góc tay phải (RC2) khi giơ tay th
 
 // Bổ sung: Cấu hình góc quay cho chế độ vẫy tay (Lệnh W)
 const int SERVO_WAVE_HIGH_ANGLE = 0;    // Góc đưa tay lên cao khi vẫy
-const int SERVO_WAVE_LOW_ANGLE  = 80;   // Góc hạ tay xuống thấp khi vẫy
+const int SERVO_WAVE_LOW_ANGLE  = 90;   // Góc hạ tay xuống thấp khi vẫy
 
-// Cấu hình công suất động cơ DC
-const int MOTOR_FORWARD_POWER         = 55;     // Công suất tiến (0 - 100%)
-const int MOTOR_BACKWARD_POWER        = -55;    // Công suất lùi (-100 - 0%)
-const unsigned long MOTOR_RUN_TIME_MS = 1500;   // Thời gian chạy tiến/lùi (1.5 giây)
+// Cấu hình công suất động cơ DC di chuyển (dùng chung cho các lộ trình tượng)
+const int MOVE_SPEED = 40;    // Công suất di chuyển mặc định (0 - 100%)
 
 // Biến quản lý thời gian
 unsigned long lastWakeUpTime = 0;
@@ -44,43 +45,43 @@ unsigned long lastWakeUpTime = 0;
 // =============================================================================
 
 /**
- * @brief Dừng toàn bộ 4 động cơ DC.
+ * @brief Dừng cả 2 động cơ di chuyển (M1, M2).
  */
 void stopMotors() {
   MiniR4.M1.setPower(0);
   MiniR4.M2.setPower(0);
-  MiniR4.M3.setPower(0);
-  MiniR4.M4.setPower(0);
 }
 
 /**
- * @brief Điều khiển 4 động cơ tiến tới trong 1.5 giây rồi dừng.
+ * @brief Đi thẳng về phía trước.
  */
-void moveForward() {
-  Serial.println("[STATUS]: Moving Forward (F)");
-  MiniR4.M1.setPower(MOTOR_FORWARD_POWER);
-  MiniR4.M2.setPower(MOTOR_FORWARD_POWER);
-  MiniR4.M3.setPower(MOTOR_FORWARD_POWER);
-  MiniR4.M4.setPower(MOTOR_FORWARD_POWER);
-  
-  delay(MOTOR_RUN_TIME_MS);
-  stopMotors();
-  Serial.println("ACK:MOVING_FORWARD");
+void thang(int speed) {
+  MiniR4.M1.setPower(speed);
+  MiniR4.M2.setPower(-speed - 5);
 }
 
 /**
- * @brief Điều khiển 4 động cơ lùi lại trong 1.5 giây rồi dừng.
+ * @brief Quay/rẽ trái.
  */
-void moveBackward() {
-  Serial.println("[STATUS]: Moving Backward (B)");
-  MiniR4.M1.setPower(MOTOR_BACKWARD_POWER);
-  MiniR4.M2.setPower(MOTOR_BACKWARD_POWER);
-  MiniR4.M3.setPower(MOTOR_BACKWARD_POWER);
-  MiniR4.M4.setPower(MOTOR_BACKWARD_POWER);
-  
-  delay(MOTOR_RUN_TIME_MS);
-  stopMotors();
-  Serial.println("ACK:MOVING_BACKWARD");
+void trai(int speed) {
+  MiniR4.M1.setPower(speed);
+  MiniR4.M2.setPower(speed + 5);
+}
+
+/**
+ * @brief Quay/rẽ phải.
+ */
+void phai(int speed) {
+  MiniR4.M1.setPower(-speed);
+  MiniR4.M2.setPower(-speed - 5);
+}
+
+/**
+ * @brief Đi lùi về phía sau.
+ */
+void lui(int speed) {
+  MiniR4.M1.setPower(-speed);
+  MiniR4.M2.setPower(speed + 5);
 }
 
 /**
@@ -119,7 +120,7 @@ void gestureWave() {
     MiniR4.RC2.setAngle(SERVO_WAVE_LOW_ANGLE);
     delay(300);
   }
-  
+
   // Trở về tư thế nghỉ mặc định
   gestureDown();
   Serial.println("ACK:WAVE_DONE");
@@ -151,7 +152,232 @@ void testSweep() {
 }
 
 // =============================================================================
-// 3. HÀM KHỞI TẠO HỆ THỐNG (SETUP)
+// 3. CÁC HÀM LỘ TRÌNH DI CHUYỂN THEO TỪNG "TƯỢNG" (Lệnh số 1 - 11)
+// =============================================================================
+
+/**
+ * @brief Lộ trình Tượng 1: Đi thẳng.
+ */
+void tuong1() {
+  Serial.println("[STATUS]: Moving Route - TUONG 1");
+  thang(MOVE_SPEED);
+  delay(5000);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_1_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 2.
+ */
+void tuong2() {
+  Serial.println("[STATUS]: Moving Route - TUONG 2");
+  thang(MOVE_SPEED);
+  delay(5400);
+  delay(500);
+  trai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(1900);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_2_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 3.
+ */
+void tuong3() {
+  Serial.println("[STATUS]: Moving Route - TUONG 3");
+  thang(MOVE_SPEED);
+  delay(5400);
+  delay(500);
+  trai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(2300);
+  lui(MOVE_SPEED);
+  delay(400);
+  trai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(1000);
+  phai(MOVE_SPEED);
+  delay(960);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_3_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 4.
+ */
+void tuong4() {
+  Serial.println("[STATUS]: Moving Route - TUONG 4");
+  thang(MOVE_SPEED);
+  delay(2000);
+  trai(MOVE_SPEED);
+  delay(960);
+  thang(MOVE_SPEED);
+  delay(1500);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_4_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 5.
+ */
+void tuong5() {
+  Serial.println("[STATUS]: Moving Route - TUONG 5");
+  trai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(2000);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_5_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 6.
+ */
+void tuong6() {
+  Serial.println("[STATUS]: Moving Route - TUONG 6");
+  phai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(1900);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_6_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 7.
+ */
+void tuong7() {
+  Serial.println("[STATUS]: Moving Route - TUONG 7");
+  phai(MOVE_SPEED);
+  delay(1000);
+  thang(MOVE_SPEED);
+  delay(1900);
+  delay(500);
+  trai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(1000);
+  delay(500);
+  phai(MOVE_SPEED);
+  delay(1000);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_7_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 8.
+ */
+void tuong8() {
+  Serial.println("[STATUS]: Moving Route - TUONG 8");
+  phai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(3000);
+  delay(500);
+  trai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(2800);
+  delay(500);
+  phai(MOVE_SPEED);
+  delay(980);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_8_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 9.
+ */
+void tuong9() {
+  Serial.println("[STATUS]: Moving Route - TUONG 9");
+  thang(MOVE_SPEED);
+  delay(5500);
+  delay(500);
+  phai(MOVE_SPEED);
+  delay(960);
+  thang(MOVE_SPEED);
+  delay(1600);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_9_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 10.
+ */
+void tuong10() {
+  Serial.println("[STATUS]: Moving Route - TUONG 10");
+  phai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(3000);
+  delay(500);
+  trai(MOVE_SPEED);
+  delay(960);
+  thang(MOVE_SPEED);
+  delay(4100);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_10_DONE");
+}
+
+/**
+ * @brief Lộ trình Tượng 11.
+ */
+void tuong11() {
+  Serial.println("[STATUS]: Moving Route - TUONG 11");
+  thang(MOVE_SPEED);
+  delay(5400);
+  delay(500);
+  trai(MOVE_SPEED);
+  delay(980);
+  thang(MOVE_SPEED);
+  delay(1900);
+  delay(500);
+  phai(MOVE_SPEED);
+  delay(980);
+
+  stopMotors();
+  Serial.println("ACK:TUONG_11_DONE");
+}
+
+/**
+ * @brief Điều phối: gọi đúng hàm lộ trình theo số thứ tự tượng (1 - 11).
+ */
+void runTuong(int soTuong) {
+  switch (soTuong) {
+    case 1:  tuong1();  break;
+    case 2:  tuong2();  break;
+    case 3:  tuong3();  break;
+    case 4:  tuong4();  break;
+    case 5:  tuong5();  break;
+    case 6:  tuong6();  break;
+    case 7:  tuong7();  break;
+    case 8:  tuong8();  break;
+    case 9:  tuong9();  break;
+    case 10: tuong10(); break;
+    case 11: tuong11(); break;
+    default:
+      Serial.print("[WARNING]: So tuong khong hop le -> ");
+      Serial.println(soTuong);
+      break;
+  }
+}
+
+// =============================================================================
+// 4. HÀM KHỞI TẠO HỆ THỐNG (SETUP)
 // =============================================================================
 void setup() {
   // 1. Khởi tạo toàn bộ hệ thống phần cứng bo mạch Matrix Mini R4
@@ -180,10 +406,11 @@ void setup() {
   gestureDown();
 
   Serial.println("[SYSTEM_READY]: Matrix Mini R4 Robot Controller Initialized.");
+  Serial.println("[HELP]: Gui so 1-11 de chay lo trinh tuong. Lenh: P, W, D, T.");
 }
 
 // =============================================================================
-// 4. VÒNG LẶP CHÍNH (LOOP)
+// 5. VÒNG LẶP CHÍNH (LOOP)
 // =============================================================================
 void loop() {
   unsigned long currentMillis = millis();
@@ -210,54 +437,60 @@ void loop() {
   // [B] NHẬN VÀ THỰC THI LỆNH ĐIỀU KHIỂN SERIAL TỪ MÁY TÍNH
   // ---------------------------------------------------------------------------
   if (Serial.available() > 0) {
-    char cmd = Serial.read();
+    // Đọc trọn 1 dòng lệnh để hỗ trợ số thứ tự tượng 2 chữ số (VD: 10, 11)
+    String lenh = Serial.readStringUntil('\n');
+    lenh.trim(); // Loại bỏ khoảng trắng, ký tự '\r' thừa
 
-    // Bỏ qua các ký tự khoảng trắng hoặc xuống dòng dư thừa
-    if (cmd == '\r' || cmd == '\n' || cmd == ' ') {
+    if (lenh.length() == 0) {
       return;
     }
 
     Serial.print("[COMMAND_RECEIVED]: ");
-    Serial.println(cmd);
+    Serial.println(lenh);
 
-    switch (cmd) {
-      case 'F': // Tiến tới 1.5s
-      case 'f':
-        moveForward();
+    // Kiểm tra xem lệnh có phải là số (lệnh di chuyển theo tượng 1-11) hay không
+    bool laSo = true;
+    for (unsigned int i = 0; i < lenh.length(); i++) {
+      if (!isDigit(lenh.charAt(i))) {
+        laSo = false;
         break;
+      }
+    }
 
-      case 'B': // Lùi lại 1.5s
-      case 'b':
-        moveBackward();
-        break;
+    if (laSo) {
+      // ----- LỆNH DI CHUYỂN: SỐ TƯỢNG (1 - 11) -----
+      int soTuong = lenh.toInt();
+      runTuong(soTuong);
+    } else {
+      // ----- LỆNH CỬ CHỈ / TIỆN ÍCH: KÝ TỰ ĐƠN -----
+      char cmd = lenh.charAt(0);
 
-      case 'P': // Cử chỉ thuyết trình (Chỉ tay phải lên)
-      case 'p':
-        gesturePresent();
-        break;
+      switch (cmd) {
+        case 'P': // Cử chỉ thuyết trình (Chỉ tay phải lên)
+        case 'p':
+          gesturePresent();
+          break;
 
-      case 'W': // Cử chỉ vẫy tay chào tạm biệt
-      case 'w':
-        gestureWave();
-        break;
+        case 'W': // Cử chỉ vẫy tay chào tạm biệt
+        case 'w':
+          gestureWave();
+          break;
 
-      case 'D': // Hạ 2 tay về tư thế nghỉ
-      case 'd':
-        gestureDown();
-        break;
+        case 'D': // Hạ 2 tay về tư thế nghỉ
+        case 'd':
+          gestureDown();
+          break;
 
-      case 'T': // Kiểm tra quét toàn diện Servo
-      case 't':
-        testSweep();
-        break;
+        case 'T': // Kiểm tra quét toàn diện Servo
+        case 't':
+          testSweep();
+          break;
 
-      default:
-        Serial.print("[WARNING]: Unknown command -> ");
-        Serial.println(cmd);
-        break;
+        default:
+          Serial.print("[WARNING]: Unknown command -> ");
+          Serial.println(lenh);
+          break;
+      }
     }
   }
-
-  // Trì hoãn nhẹ 10ms để giảm tải CPU cho vi điều khiển
-  delay(10);
 }

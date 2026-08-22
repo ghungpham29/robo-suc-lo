@@ -1,12 +1,34 @@
 @echo off
 chcp 65001 > nul
+title ROBOT HUONG DAN VIEN TRIEN LAM VAN HOA - KALEPIC
 echo ======================================================================
-echo    ROBOT HUONG DAN VIEN TRIEN LAM VAN HOA (PHIEN BAN v5.0 PRO)
+echo    🤖 ROBOT HƯỚNG DẪN VIÊN TRIỂN LÃM VĂN HÓA - KALEPIC (v5.2 PRO) 🤖
 echo ======================================================================
-py -3.11 main.py
+echo.
+
+cd /d "%~dp0"
+
+REM 1. Ưu tiên môi trường ảo .venv của dự án
+if exist "..\\.venv\\Scripts\\python.exe" (
+    echo [*] Đang khởi chạy bằng môi trường ảo .venv...
+    "..\\.venv\\Scripts\\python.exe" main.py
+    goto end
+)
+
+if exist ".venv\\Scripts\\python.exe" (
+    echo [*] Đang khởi chạy bằng môi trường ảo .venv...
+    ".venv\\Scripts\\python.exe" main.py
+    goto end
+)
+
+REM 2. Fallback sang lệnh python hệ thống
+echo [*] Đang khởi chạy bằng Python hệ thống...
+python main.py
+
+:end
 if errorlevel 1 (
     echo.
-    echo [THONG BAO] Dang thu chay bang duong dan Python 3.11 truc tiep...
-    "C:\Users\ADMIN\AppData\Local\Programs\Python\Python311\python.exe" main.py
+    echo [!] Đã có lỗi xảy ra trong quá trình chạy.
 )
+echo.
 pause

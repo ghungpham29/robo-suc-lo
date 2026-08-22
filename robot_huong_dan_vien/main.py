@@ -66,9 +66,10 @@ def print_banner():
 
     banner = f"""
 ================================================================================
-     ROBOT HƯỚNG DẪN VIÊN TRIỂN LÃM VĂN HÓA (AI CULTURAL GUIDE v6.0 PRO)
+     ROBOT HƯỚNG DẪN VIÊN TRIỂN LÃM VĂN HÓA (KALEPIC v6.0 PRO)
               Trường THPT Quốc Học Quy Nhơn - Tỉnh Bình Định
 ================================================================================
+  * Danh tính Robot: 🤖 Kalepic (AI Cultural Guide)
   * Chế độ hoạt động: 🎙️ Voice-to-Voice (Đàm thoại Giọng nói qua Micro) [{mic_info}]
   * AI Core: Google Gemini Flash (Phản hồi tức thì < 200ms)
   * Voice Engine: Động cơ phát giọng nói thời gian thực (Zero Latency)
@@ -77,7 +78,7 @@ def print_banner():
   * Matrix Mini R4: Kết nối phần cứng động cơ [{serial_info}]
 ================================================================================
   [Quy trình tương tác]
-    1. Khi phát hiện khách mới: Robot chào đón 1 lần duy nhất.
+    1. Khi phát hiện khách mới: Kalepic chào đón 1 lần duy nhất.
     2. Chờ khách hỏi trong 15 giây qua Micro.
     3. Trả lời tức thì & cử động tay theo nội dung thuyết minh.
     4. Nói "tạm biệt" hoặc nhấn Ctrl+C để kết thúc.
@@ -175,7 +176,7 @@ def on_hardware_wake_up():
 
     _last_interaction_time = now
     print("\n🔔 [PHẦN CỨNG] Cảm biến Matrix Mini R4 phát hiện du khách mới đến gần!")
-    greeting_query = "Hãy chào đón và giới thiệu ngắn gọn trong 1 câu thân thiện về triển lãm cho khách tham quan mới đến."
+    greeting_query = "Hãy chào đón và giới thiệu bạn là Kalepic, robot hướng dẫn viên triển lãm văn hóa một cách ngắn gọn, thân thiện trong 1 câu."
     process_user_query(greeting_query)
 
 
@@ -188,7 +189,7 @@ def main():
 
     print_banner()
 
-    initial_greeting = "Xin chào quý khách! Tôi là robot hướng dẫn viên triển lãm văn hóa. Rất hân hạnh được phục vụ bạn."
+    initial_greeting = "Xin chào quý khách! Tôi là Kalepic, robot hướng dẫn viên triển lãm văn hóa. Rất hân hạnh được phục vụ bạn."
     print(f"[ROBOT]: {initial_greeting}\n")
     try:
         perform_speech_gesture_start()
